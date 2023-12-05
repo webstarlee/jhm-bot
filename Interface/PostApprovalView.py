@@ -174,10 +174,8 @@ class PostApprovalView(View):
             await logging_channel.send(embed=discord.Embed(title="Post Approved", description=f"**Posted By:** {post_author.mention}\n**Post Type:** Unpaid Job\n**Approved By:** {interaction.user.mention}\n**Post Link:** {forum_thread.thread.jump_url}", color=discord.Color.green()))
 
         if post_type == 'commission':
-            post_payment = post_data[3]
             commission_jobs_forum = interaction.guild.get_channel(config.COMMISSION_JOB_FORUM_ID)
             logging_channel = interaction.guild.get_channel(config.APPROVAL_LOGGING_CHANNEL_ID)
-            ping_role = interaction.guild.get_role(post_data[6])
 
             post_embed = discord.Embed(
                 title=f"{config.PERSON_EMOJI} {post_title}",
@@ -216,10 +214,9 @@ class PostApprovalView(View):
             self.reject_btn.style = ButtonStyle.gray
 
             await interaction.response.edit_message(view=self)
-            database.execute("DELETE FROM IncomingPosts WHERE post_id = ?", (post_id,)).connection.commit()
-            
-            database.execute("INSERT INTO OutgoingPosts VALUES (?, ?, ?, ?, NULL, ?, ?)", (post_id, post_author.id, interaction.user.id, forum_thread.message.id, forum_thread.thread.id, round(datetime.datetime.now().timestamp()),)).connection.commit()
-            database.execute("UPDATE Posts SET status = ? WHERE post_id = ?", ('approved', post_id,)).connection.commit()
+            incoming_post_remove(post_id)
+            insert_out_going_post(post_id, post_author.id, interaction.user.id, forum_thread.message.id, forum_thread.thread.id)
+            update_for_fire_post_status(post_id, "approved")
             await logging_channel.send(embed=discord.Embed(title="Post Approved", description=f"**Posted By:** {post_author.mention}\n**Post Type:** Commission\n**Approved By:** {interaction.user.mention}\n**Post Link:** {forum_thread.thread.jump_url}", color=discord.Color.green()))
 
     @button(label="Reject", style=ButtonStyle.red, custom_id="reject_button")

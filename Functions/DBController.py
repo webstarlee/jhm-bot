@@ -154,3 +154,28 @@ def update_unpaid_job_post(post_id, post_title, post_desc, post_deadline):
         post.post_desc = post_desc
         post.post_deadline = post_deadline
         db.session.commit()
+    
+
+def insert_commission_post(post_id, user_id, post_title, post_desc, post_payment, post_deadline):
+    commission_post = Post(
+        post_id=post_id,
+        user_id=user_id,
+        posted_at=round(datetime.datetime.now().timestamp()),
+        post_title=post_title,
+        post_desc=post_desc,
+        post_payment=post_payment,
+        post_deadline=post_deadline,
+        post_type="commission",
+    )
+    db.session.add(commission_post)
+    db.session.commit()
+
+def update_commission_post(post_id, post_title, post_desc, post_payment, post_deadline):
+    post = db.session.query(Post).filter_by(post_id=post_id).one_or_none()
+    if post != None:
+        post.post_title = post_title
+        post.posted_at = round(datetime.datetime.now().timestamp())
+        post.post_desc = post_desc
+        post.post_payment = post_payment
+        post.post_deadline = post_deadline
+        db.session.commit()
