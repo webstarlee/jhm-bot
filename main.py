@@ -2,7 +2,7 @@ import os
 import config
 import sqlite3
 import discord
-
+from Functions.DBController import init_function
 from discord.ext import commands
 from Interface.BumpView import BumpView
 from Interface.GenerateEmbedView import EmbedView

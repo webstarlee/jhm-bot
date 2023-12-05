@@ -7,6 +7,13 @@ from Interface.BumpView import BumpView
 from discord import ButtonStyle, TextStyle
 from discord.ui import View, Modal, TextInput, Button, button
 from Interface.JobPostView import PostView, ForHirePostView, PaidJobPostView
+from Functions.DBController import (
+    find_incoming_post,
+    find_post_by_post_id,
+    incoming_post_remove,
+    insert_out_going_post,
+    update_for_fire_post_status
+)
 
 database = sqlite3.connect("./Databases/posts.sqlite")
 
@@ -16,16 +23,17 @@ class PostApprovalView(View):
     
     @button(label="Approve", style=ButtonStyle.green, custom_id="approve_button")
     async def approve_btn(self, interaction: discord.Interaction, button: Button):
-        post_id_data = database.execute("SELECT post_id FROM IncomingPosts WHERE message_id = ?", (interaction.message.id,)).fetchone()
-        post_data = database.execute("SELECT user_id, post_title, post_desc, post_payment, post_deadline, post_type, ping_role FROM Posts WHERE post_id = ?", (post_id_data[0],)).fetchone()
-
-        post_id = post_id_data[0]
-        post_author = interaction.guild.get_member(post_data[0])
-        post_title = post_data[1]
-        post_description = post_data[2]
-        post_deadline = "N/A" if not post_data[4] else post_data[4]
-        post_type = post_data[5]
-        ping_role = interaction.guild.get_role(post_data[6])
+        incoming_post = find_incoming_post(interaction.message.id)
+        post_data = find_post_by_post_id(incoming_post.post_id)
+        post_id = post_data.post_id
+        post_author = interaction.guild.get_member(post_data.user_id)
+        post_title = post_data.post_title
+        post_description = post_data.post_desc
+        post_portfolio = "N/A" if not post_data.post_portfolio else post_data.post_portfolio
+        post_payment = post_data.post_payment.capitalize()
+        post_deadline = "N/A" if not post_data.post_deadline else post_data.post_deadline
+        post_type = post_data.post_type
+        ping_role = interaction.guild.get_role(post_data.ping_role)
 
         if post_type == 'paid':
             post_payment = post_data[3]
@@ -75,8 +83,6 @@ class PostApprovalView(View):
             await logging_channel.send(embed=discord.Embed(title="Post Approved", description=f"**Posted By:** {post_author.mention}\n**Post Type:** Paid Job\n**Approved By:** {interaction.user.mention}\n**Post Link:** {post_msg.jump_url}", color=discord.Color.green()))
         
         if post_type == 'forhire':
-            post_payment = post_data[3].capitalize()
-            ping_role = interaction.guild.get_role(post_data[6])
             for_hire_forum = interaction.guild.get_channel(config.FOR_HIRE_FORUM_ID)
             logging_channel = interaction.guild.get_channel(config.APPROVAL_LOGGING_CHANNEL_ID)
 
@@ -84,6 +90,11 @@ class PostApprovalView(View):
                 title=f"{config.PERSON_EMOJI} {post_title}",
                 description=f"{config.INVISIBLE_CHARACTER}\n{config.DESCRIPTION_EMOJI} **Description:**\n{config.TOP_TO_RIGHT_EMOJI} {post_description}\n{config.INVISIBLE_CHARACTER}",
                 color=config.JHM_BLUE
+            )
+            post_embed.add_field(
+                name=f"{config.INFO_EMOJI} Portfolio:",
+                value=f"{config.TOP_TO_RIGHT_EMOJI} {post_portfolio}",
+                inline=False
             )
             post_embed.add_field(
                 name=f"{config.CARD_EMOJI} Payment Method:",
@@ -112,9 +123,9 @@ class PostApprovalView(View):
             await forum_thread.thread.send(view=BumpView())
 
             await interaction.response.edit_message(view=self)
-            database.execute("DELETE FROM IncomingPosts WHERE post_id = ?", (post_id,)).connection.commit()
-            database.execute("INSERT INTO OutgoingPosts VALUES (?, ?, ?, ?, ?, ?, ?)", (post_id, post_author.id, interaction.user.id, forum_thread.message.id, None, forum_thread.thread.id, round(datetime.datetime.now().timestamp()),)).connection.commit()
-            database.execute("UPDATE Posts SET status = ? WHERE post_id = ?", ('approved', post_id,)).connection.commit()
+            incoming_post_remove(post_id)
+            insert_out_going_post(post_id, post_author.id, interaction.user.id, forum_thread.message.id, forum_thread.thread.id)
+            update_for_fire_post_status(post_id, "approved")
             try:
                 await post_author.send(content="{} Your post **[{}]({})** has been approved.".format(config.DONE_EMOJI, post_title, forum_thread.message.jump_url))
             except:
@@ -208,6 +219,7 @@ class PostApprovalView(View):
 
             await interaction.response.edit_message(view=self)
             database.execute("DELETE FROM IncomingPosts WHERE post_id = ?", (post_id,)).connection.commit()
+            
             database.execute("INSERT INTO OutgoingPosts VALUES (?, ?, ?, ?, NULL, ?, ?)", (post_id, post_author.id, interaction.user.id, forum_thread.message.id, forum_thread.thread.id, round(datetime.datetime.now().timestamp()),)).connection.commit()
             database.execute("UPDATE Posts SET status = ? WHERE post_id = ?", ('approved', post_id,)).connection.commit()
             await logging_channel.send(embed=discord.Embed(title="Post Approved", description=f"**Posted By:** {post_author.mention}\n**Post Type:** Commission\n**Approved By:** {interaction.user.mention}\n**Post Link:** {forum_thread.thread.jump_url}", color=discord.Color.green()))
@@ -229,12 +241,11 @@ class PostRejectModal(Modal, title="Post Reject Modal"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        data = database.execute("SELECT post_id FROM IncomingPosts WHERE message_id = ?", (interaction.message.id,)).fetchone()
-        post_id = data[0]
-        post_data = database.execute("SELECT user_id, post_title, post_desc, post_payment, post_deadline FROM Posts WHERE post_id = ?", (post_id,)).fetchone()
-        post_author = interaction.guild.get_member(post_data[0])
-
-        database.execute("UPDATE Posts SET status = ? WHERE post_id = ?", ('rejected', post_id,)).connection.commit()
+        incoming_post = find_incoming_post(interaction.message.id)
+        post_data = find_post_by_post_id(incoming_post.post_id)
+        post_id = post_data.post_id
+        post_author = interaction.guild.get_member(post_data.user_id)
+        update_for_fire_post_status(post_id, "rejected")
 
         logging_channel = interaction.guild.get_channel(config.APPROVAL_LOGGING_CHANNEL_ID)
 

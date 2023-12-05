@@ -3,6 +3,9 @@ TOKEN = "MTE3OTYxMzkyNDc2OTkzOTQ4Ng.Gl9Nwq.XaHa9poOw06CUSmAPrHByfgfNvm2ovwqL5xl_
 APPLICATION_ID = 1179613924769939486
 GUILD_ID = 970671883139817532
 PREFIX = "!"
+# -----------------------< DB URI > -------------------------------
+
+DB_URI="sqlite:///Databases/jhm.db"
 
 # -----------------------< HEX Color Codes >-----------------------
 
