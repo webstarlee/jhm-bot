@@ -5,8 +5,7 @@ import datetime
 
 from discord import ButtonStyle
 from discord.ui import Button, View, button
-
-database = sqlite3.connect("./Databases/posts.sqlite")
+from Functions.DBController import find_out_going_post_by_forum_id, update_out_going_post_bumped_at
 
 class BumpView(View):
     def __init__(self):
@@ -14,19 +13,19 @@ class BumpView(View):
     
     @button(label="Bump", emoji="🚀", style=ButtonStyle.blurple, custom_id="bump_post")
     async def bump_btn(self, interaction: discord.Interaction, button: Button):
-        data = database.execute("SELECT post_id, user_id, message_id, bumped_at FROM OutgoingPosts WHERE forum_id = ?", (interaction.channel.id,)).fetchone()
+        data = find_out_going_post_by_forum_id(interaction.channel.id)
         if data:
-            post_id = data[0]
-            bumped_at = 0 if not data[1] else int(data[3])
-            user = interaction.guild.get_member(int(data[1]))
+            post_id = data.post_id
+            bumped_at = 0 if not data.bumped_at else int(data.bumped_at)
+            user = interaction.guild.get_member(int(data.user_id))
             logs_channel = interaction.guild.get_channel(config.POST_LOGGING_CHANNEL_ID)
             current_time = round(datetime.datetime.now().timestamp())
-            message = interaction.channel.get_partial_message(data[2])
+            message = interaction.channel.get_partial_message(data.message_id)
 
             if interaction.user == user:
                 if int(current_time - bumped_at) >= 115200:
                     await interaction.channel.send(content="Bump!", delete_after=3)
-                    database.execute("UPDATE OutgoingPosts SET bumped_at = ? WHERE forum_id = ?", (current_time, interaction.channel.id,)).connection.commit()
+                    update_out_going_post_bumped_at(interaction.channel.id, current_time)
                     await logs_channel.send(embed=discord.Embed(title="Post Bumped", description="**Type:** Manual\n**Author:** {}\n**Post ID:** [{}]({})".format(user.mention, post_id, message.jump_url), color=discord.Color.blue(), timestamp=datetime.datetime.now()))
                     await interaction.response.defer()
                 else:

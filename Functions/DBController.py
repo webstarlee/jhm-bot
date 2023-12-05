@@ -82,3 +82,14 @@ def incoming_post_remove(post_id):
 def find_incoming_post(message_id):
     incoming_post = db.session.query(IncomingPost).filter_by(message_id=message_id).one_or_none()
     return incoming_post
+
+def find_out_going_post_by_forum_id(forum_id):
+    outgoing_post = db.session.query(OutgoingPost).filter_by(forum_id=forum_id).one_or_none()
+    return outgoing_post
+
+def update_out_going_post_bumped_at(forum_id, bumped_at):
+    outgoing_post = db.session.query(OutgoingPost).filter_by(forum_id=forum_id).one_or_none()
+    if outgoing_post:
+        outgoing_post.bumped_at = bumped_at
+        db.session.commit()
+        
