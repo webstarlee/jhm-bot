@@ -11,8 +11,16 @@ from Interface.JobPostView import PostView
 from discord import ButtonStyle, TextStyle
 from Interface.PostApprovalView import PostApprovalView
 from discord.ui import View, Button, Modal, TextInput, Select, button
-
-database = sqlite3.connect("./Databases/posts.sqlite")
+from Functions.DBController import (
+    insert_unpaid_job_post,
+    update_for_fire_post_ping_role,
+    find_post_by_post_id,
+    update_unpaid_job_post,
+    update_for_fire_post_status,
+    insert_out_going_post,
+    insert_incoming_post,
+    post_remove
+)
 
 class UnpaidJobSubmitView(View):
     def __init__(self):
@@ -30,11 +38,11 @@ class UnpaidJobSubmitView(View):
     @button(label="Edit Post", style=ButtonStyle.gray, row=1)
     async def edit_post_btn(self, interaction: discord.Interaction, button: Button):
         post_id = interaction.message.embeds[0].footer.text[9:]
-        post_data = database.execute("SELECT post_title, post_desc, post_payment, post_deadline FROM Posts WHERE post_id = ?", (post_id,)).fetchone()
+        post_data = find_post_by_post_id(post_id)
 
-        post_title = post_data[0]
-        post_desc = post_data[1]
-        post_deadline = None if post_data[3] == 'N/A' else post_data[3]
+        post_title = post_data.post_title
+        post_desc = post_data.post_desc
+        post_deadline = None if post_data.post_deadline == 'N/A' else post_data.post_deadline
 
         await interaction.response.send_modal(UnpaidJobEditModal(post_title, post_desc, post_deadline))
 
@@ -71,7 +79,7 @@ class NotificationSelector(Select):
     
     async def callback(self, interaction: discord.Interaction):
         post_id = interaction.message.embeds[0].footer.text[9:]
-        database.execute("UPDATE Posts SET ping_role = ? WHERE post_id = ?", (self.values[0], post_id,)).connection.commit()
+        update_for_fire_post_ping_role(post_id, self.values[0])
         await interaction.response.edit_message(view=UnpaidJobSubmitView())
 
 class UnpaidJobFinalView(View):
@@ -83,15 +91,16 @@ class UnpaidJobFinalView(View):
     async def check_submit_btn(self, interaction: discord.Interaction, button: Button):
         premium_role = interaction.guild.get_role(config.PREMIUM_ROLE_ID)
         vip_role = interaction.guild.get_role(config.VIP_ROLE_ID)
-        if premium_role in interaction.user.roles or vip_role in interaction.user.roles:
-            post_data = database.execute("SELECT user_id, post_title, post_desc, post_payment, post_deadline, post_type, ping_role FROM Posts WHERE post_id = ?", (self.post_id,)).fetchone()
+        post_data = find_post_by_post_id(self.post_id)
 
-            post_id = self.post_id
-            post_author = interaction.guild.get_member(post_data[0])
-            post_title = post_data[1]
-            post_description = post_data[2]
-            post_deadline = "N/A" if not post_data[4] else post_data[4]
-            ping_role = interaction.guild.get_role(post_data[6])
+        post_id = self.post_id
+        post_author = interaction.guild.get_member(post_data.user_id)
+        post_title = post_data.post_title
+        post_description = post_data.post_desc
+        post_deadline = "N/A" if not post_data.post_deadline else post_data.post_deadline
+        ping_role = interaction.guild.get_role(post_data.ping_role)
+        
+        if premium_role in interaction.user.roles or vip_role in interaction.user.roles:
             unpaid_jobs_forum = interaction.guild.get_channel(config.UNPAID_JOB_FORUM_ID)
             logging_channel = interaction.guild.get_channel(config.APPROVAL_LOGGING_CHANNEL_ID)
 
@@ -122,19 +131,11 @@ class UnpaidJobFinalView(View):
             await forum_thread.thread.send(view=BumpView())
 
             await interaction.response.edit_message(view=self)
-            database.execute("INSERT INTO OutgoingPosts VALUES (?, ?, ?, ?, NULL, ?, ?)", (post_id, post_author.id, interaction.user.id, forum_thread.message.id, forum_thread.thread.id, round(datetime.datetime.now().timestamp()),)).connection.commit()
-            database.execute("UPDATE Posts SET status = ? WHERE post_id = ?", ('auto', post_id,)).connection.commit()
+            update_for_fire_post_status(post_id, "auto")
+            insert_out_going_post(post_id, post_author.id, interaction.user.id, forum_thread.message.id, forum_thread.thread.id)
             await interaction.response.edit_message(content="{} Your post have been automatically approved!\nYou can view your post here -> {}".format(config.DONE_EMOJI, forum_thread.message.jump_url), view=None)
             await logging_channel.send(embed=discord.Embed(title="Post Auto Approved", description=f"**Posted By:** {post_author.mention}\n**Post Type:** Unpaid Job\n**Approved By:** {interaction.client.user.mention}\n**Post Link:** {forum_thread.thread.jump_url}", color=discord.Color.blue()))
             return
-        
-        post_data = database.execute("SELECT user_id, post_title, post_desc, post_deadline, ping_role FROM Posts WHERE post_id = ?", (self.post_id,)).fetchone()
-
-        post_author = interaction.guild.get_member(post_data[0])
-        post_title = post_data[1]
-        post_description = post_data[2]
-        post_deadline = "N/A" if not post_data[3] else post_data[3]
-        post_ping = interaction.guild.get_role(post_data[4])
 
         post_approval_channel = interaction.guild.get_channel(config.PAID_JOB_APPROVAL_CHANNEL_ID)
 
@@ -150,19 +151,19 @@ class UnpaidJobFinalView(View):
         )
         post_embed.add_field(
             name=f"{config.INFO_EMOJI} Post Information:",
-            value=f"- **User:** {post_author.mention} ({post_author.id})\n- **Type:** Unpaid Job Post\n- **Category:** {post_ping.mention}",
+            value=f"- **User:** {post_author.mention} ({post_author.id})\n- **Type:** Unpaid Job Post\n- **Category:** {ping_role.mention}",
             inline=False
         )
         post_embed.set_footer(text="Post ID: {}".format(self.post_id))
         post_embed.set_image(url=config.UNPAID_JOB_BANNER_URL)
         
         post_msg = await post_approval_channel.send(embed=post_embed, view=PostApprovalView())
-        database.execute("INSERT INTO IncomingPosts VALUES (?, ?, ?)", (self.post_id, post_author.id, post_msg.id,)).connection.commit()
+        insert_incoming_post(self.post_id, post_author.id, post_msg.id)
         await interaction.response.edit_message(content="{} Post submitted for approval.".format(config.DONE_EMOJI), embed=None, view=None)
 
     @button(label="Nevermind", style=ButtonStyle.gray)
     async def nevermind_btn(self, interaction: discord.Interaction, button: Button):
-        database.execute("DELETE FROM Posts WHERE post_id = ?", (self.post_id,)).connection.commit()
+        post_remove(self.post_id)
         await interaction.response.edit_message(content="{} Alright, Have a nice day!".format('👋'), view=None)
 
 class UnpaidJobModal(Modal, title="Create an Unpaid Job Post"):
@@ -221,34 +222,7 @@ class UnpaidJobModal(Modal, title="Create an Unpaid Job Post"):
         post_embed.set_footer(text="Post ID: {}".format(id))
         post_embed.set_image(url=config.UNPAID_JOB_BANNER_URL)
         
-        database.execute(
-            '''
-                INSERT INTO Posts VALUES (
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?
-                )
-            ''',
-            (
-                id,
-                interaction.user.id,
-                round(datetime.datetime.now().timestamp()),
-                self.post_title.value,
-                self.post_desc.value,
-                None,
-                "N/A" if not self.post_deadline.value else self.post_deadline.value,
-                'false',
-                'unpaid',
-                None,
-            )
-        ).connection.commit()
+        insert_unpaid_job_post(id, interaction.user.id, post_title, post_description, post_deadline)
 
         await interaction.response.send_message(embed=post_embed, view=NotificationSelectorView(), ephemeral=True)
     
@@ -294,22 +268,16 @@ class UnpaidJobEditModal(Modal, title="Create an Unpaid Job Post"):
                 self.post_deadline.value = 'N/A'
 
         post_id = interaction.message.embeds[0].footer.text[9:]
-        data = database.execute("SELECT * FROM Posts WHERE post_id = ?", (post_id,)).fetchone()
+        data = find_post_by_post_id(post_id)
         if data:
             post_title = self.post_title.value
             post_description = self.post_desc.value
-            post_payment = self.post_payment.value
             post_deadline = "N/A" if not self.post_deadline.value else self.post_deadline.value
 
             post_embed = discord.Embed(
                 title=f"{config.PERSON_EMOJI} {post_title}",
                 description=f"{config.INVISIBLE_CHARACTER}\n{config.DESCRIPTION_EMOJI} **Description:**\n{config.TOP_TO_RIGHT_EMOJI} {post_description}\n{config.INVISIBLE_CHARACTER}",
                 color=config.JHM_BLUE
-            )
-            post_embed.add_field(
-                name=f"{config.CARD_EMOJI} Budget:",
-                value=f"{config.TOP_TO_RIGHT_EMOJI} {post_payment}",
-                inline=True
             )
             post_embed.add_field(
                 name=f"{config.CLOCK_EMOJI} Deadline:",
@@ -319,23 +287,7 @@ class UnpaidJobEditModal(Modal, title="Create an Unpaid Job Post"):
             post_embed.set_footer(text="Post ID: {}".format(post_id))
             post_embed.set_image(url=config.UNPAID_JOB_BANNER_URL)
             
-            database.execute(
-                '''
-                    UPDATE Posts SET
-                        posted_at = ?,
-                        post_title = ?,
-                        post_desc = ?,
-                        post_deadline = ?
-                    WHERE post_id = ?
-                ''',
-                (
-                    round(datetime.datetime.now().timestamp()),
-                    self.post_title.value,
-                    self.post_desc.value,
-                    "N/A" if not self.post_deadline.value else self.post_deadline.value,
-                    post_id,
-                )
-            ).connection.commit()
+            update_unpaid_job_post(post_id, post_title, post_description, post_deadline)
         
             await interaction.response.edit_message(embed=post_embed, view=NotificationSelectorView())
         

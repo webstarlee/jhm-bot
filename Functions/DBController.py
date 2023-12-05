@@ -132,3 +132,25 @@ def find_reviews_by_creator(user_id):
     reviews = db.session.query(Review).filter_by(freelancer_id=user_id).all()
     
     return reviews
+
+def insert_unpaid_job_post(post_id, user_id, post_title, post_desc, post_deadline):
+    paid_job_post = Post(
+        post_id=post_id,
+        user_id=user_id,
+        posted_at=round(datetime.datetime.now().timestamp()),
+        post_title=post_title,
+        post_desc=post_desc,
+        post_deadline=post_deadline,
+        post_type="unpaid",
+    )
+    db.session.add(paid_job_post)
+    db.session.commit()
+
+def update_unpaid_job_post(post_id, post_title, post_desc, post_deadline):
+    post = db.session.query(Post).filter_by(post_id=post_id).one_or_none()
+    if post != None:
+        post.post_title = post_title
+        post.posted_at = round(datetime.datetime.now().timestamp())
+        post.post_desc = post_desc
+        post.post_deadline = post_deadline
+        db.session.commit()
