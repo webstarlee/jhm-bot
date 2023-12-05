@@ -5,8 +5,11 @@ import datetime
 
 from discord import ButtonStyle, TextStyle
 from discord.ui import Modal, View, TextInput, Button, button
-
-database = sqlite3.connect("./Databases/posts.sqlite")
+from Functions.DBController import (
+    find_post_by_post_id,
+    insert_report_post,
+    find_reviews_by_creator
+)
 
 class PostView(View):
     def __init__(self):
@@ -15,8 +18,8 @@ class PostView(View):
     @button(label="Apply", emoji='📝', style=ButtonStyle.blurple, custom_id="apply_button")
     async def apply_button(self, interaction: discord.Interaction, button: Button):
         post_id = interaction.message.embeds[0].footer.text[9:]
-        data = database.execute("SELECT user_id FROM OutgoingPosts WHERE post_id = ?", (post_id,)).fetchone()
-        post_author = interaction.guild.get_member(int(data[0]))
+        data = find_post_by_post_id(post_id)
+        post_author = interaction.guild.get_member(int(data.user_id))
         await interaction.response.send_message(content=f"The job opportunity has been posted by {post_author.mention} ({post_author.name}). To apply, please reach out directly to their DMs.", ephemeral=True)
 
     @button(label="Report", emoji='🚨', style=ButtonStyle.red, custom_id="report_btn")
@@ -30,8 +33,8 @@ class PaidJobPostView(View):
     @button(label="Apply", emoji='📝', style=ButtonStyle.blurple, custom_id="apply_paid_job_button")
     async def apply_paid_job_btn(self, interaction: discord.Interaction, button: Button):
         post_id = interaction.message.embeds[0].footer.text[9:]
-        data = database.execute("SELECT user_id FROM OutgoingPosts WHERE post_id = ?", (post_id,)).fetchone()
-        post_author = interaction.guild.get_member(int(data[0]))
+        data = find_post_by_post_id(post_id)
+        post_author = interaction.guild.get_member(int(data.user_id))
         await interaction.response.send_message(content=f"The job opportunity has been posted by {post_author.mention} ({post_author.name}). To apply, please reach out directly to their DMs.", ephemeral=True)
 
     @button(label="Report", emoji='🚨', style=ButtonStyle.red, custom_id="report_paid_job_button")
@@ -45,16 +48,16 @@ class ForHirePostView(View):
     @button(label="Connect", emoji='🔗', style=ButtonStyle.blurple, custom_id="connect_forhire_btn")
     async def connect_forhire_btn(self, interaction: discord.Interaction, button: Button):
         post_id = interaction.message.embeds[0].footer.text[9:]
-        data = database.execute("SELECT user_id FROM OutgoingPosts WHERE post_id = ?", (post_id,)).fetchone()
-        post_author = interaction.guild.get_member(int(data[0]))
+        data = find_post_by_post_id(post_id)
+        post_author = interaction.guild.get_member(int(data.user_id))
         await interaction.response.send_message(content=f"Hey {interaction.user.mention}, to connect with {post_author.display_name}, simply DM ({post_author.mention}) ({post_author.name}) and initiate contact.", ephemeral=True)
 
     @button(label="Reviews", emoji='⭐', style=ButtonStyle.green, custom_id='reviews_forhire_btn')
     async def reviews_forhire_btn(self, interaction: discord.Interaction, button: Button):
         post_id = interaction.message.embeds[0].footer.text[9:]
-        post_data = database.execute("SELECT user_id FROM OutgoingPosts WHERE post_id = ?", (post_id,)).fetchone()
-        author = interaction.guild.get_member(int(post_data[0]))
-        data = database.execute("SELECT client_id, stars, review FROM Reviews WHERE freelancer_id = ?", (author.id,)).fetchall()
+        post_data = find_post_by_post_id(post_id)
+        author = interaction.guild.get_member(int(post_data.user_id))
+        data = find_reviews_by_creator(author.id)
 
         embed = discord.Embed(
             title=f"{author.display_name}'s Reviews",
@@ -65,9 +68,9 @@ class ForHirePostView(View):
             embed.description = "No reviews found."
         else:
             for entry in data:
-                client = interaction.guild.get_member(entry[0])
-                stars = int(entry[1])
-                review = str(entry[2])
+                client = interaction.guild.get_member(entry.client_id)
+                stars = int(entry.stars)
+                review = str(entry.review)
 
                 embed.add_field(
                     name=f"Review by {client.display_name}",
@@ -96,8 +99,8 @@ class ReportModal(Modal, title="Report Post Modal"):
         reports_channel = interaction.guild.get_channel(config.REPORTS_CHANNEL_ID)
         post_id = interaction.message.embeds[0].footer.text[9:]
 
-        data = database.execute("SELECT user_id, posted_at FROM Posts WHERE post_id = ?", (post_id,)).fetchone()
-        post_author = interaction.guild.get_member(data[0])
+        data = find_post_by_post_id(post_id)
+        post_author = interaction.guild.get_member(data.user_id)
 
         report_embed = discord.Embed(
             title="Post Reported - {}".format(post_id),
@@ -105,7 +108,7 @@ class ReportModal(Modal, title="Report Post Modal"):
         )
         report_embed.add_field(
             name="Post Information:",
-            value=f"**Posted By:** {post_author.mention}\n**Posted On:** <t:{data[1]}:f>\n**Post:** {interaction.message.jump_url}",
+            value=f"**Posted By:** {post_author.mention}\n**Posted On:** <t:{data.posted_at}:f>\n**Post:** {interaction.message.jump_url}",
             inline=False
         )
         report_embed.add_field(
@@ -115,5 +118,5 @@ class ReportModal(Modal, title="Report Post Modal"):
         )
 
         report_msg = await reports_channel.send(embed=report_embed)
-        database.execute("INSERT INTO PostReports VALUES (?, ?, ?, ?, ?)", (post_id, report_msg.id, interaction.user.id, round(datetime.datetime.now().timestamp()), 'open')).connection.commit()
+        insert_report_post(post_id, report_msg.id, interaction.user.id)
         await interaction.response.send_message(content="{} Your report have been submitted.".format(config.REPORT_EMOJI), ephemeral=True)

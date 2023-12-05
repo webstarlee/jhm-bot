@@ -36,7 +36,6 @@ class PostApprovalView(View):
         ping_role = interaction.guild.get_role(post_data.ping_role)
 
         if post_type == 'paid':
-            post_payment = post_data[3]
             paid_jobs_channel = interaction.guild.get_channel(config.PAID_JOBS_CHANNEL_ID)
             logging_channel = interaction.guild.get_channel(config.APPROVAL_LOGGING_CHANNEL_ID)
             
@@ -70,9 +69,9 @@ class PostApprovalView(View):
 
             await interaction.response.edit_message(view=self)
             post_msg = await paid_jobs_channel.send(content=f"Notification:: {ping_role.mention}", embed=post_embed, view=PaidJobPostView())
-            database.execute("DELETE FROM IncomingPosts WHERE post_id = ?", (post_id,)).connection.commit()
-            database.execute("INSERT INTO OutgoingPosts VALUES (?, ?, ?, ?, NULL, NULL, NULL)", (post_id, post_author.id, interaction.user.id, post_msg.id,)).connection.commit()
-            database.execute("UPDATE Posts SET status = ? WHERE post_id = ?", ('approved', post_id,)).connection.commit()
+            incoming_post_remove(post_id)
+            insert_out_going_post(post_id, post_author.id, interaction.user.id, post_msg.id, "NULL")
+            update_for_fire_post_status(post_id, "approved")
             try:
                 # await post_author.send(content="{} Your post **[{}]({})** has been approved.".format(config.DONE_EMOJI, post_title, post_msg.jump_url))
                 message = "{} Your post **[{}](<{}>)** has been approved.".format(config.DONE_EMOJI, post_title, post_msg.jump_url)

@@ -92,4 +92,43 @@ def update_out_going_post_bumped_at(forum_id, bumped_at):
     if outgoing_post:
         outgoing_post.bumped_at = bumped_at
         db.session.commit()
-        
+
+def insert_paid_job_post(post_id, user_id, post_title, post_desc, post_payment, post_deadline):
+    paid_job_post = Post(
+        post_id=post_id,
+        user_id=user_id,
+        posted_at=round(datetime.datetime.now().timestamp()),
+        post_title=post_title,
+        post_desc=post_desc,
+        post_payment=post_payment,
+        post_deadline=post_deadline,
+        post_type="paid",
+    )
+    db.session.add(paid_job_post)
+    db.session.commit()
+
+def update_paid_job_post(post_id, post_title, post_desc, post_payment, post_deadline):
+    post = db.session.query(Post).filter_by(post_id=post_id).one_or_none()
+    if post != None:
+        post.post_title = post_title
+        post.posted_at = round(datetime.datetime.now().timestamp())
+        post.post_desc = post_desc
+        post.post_payment = post_payment
+        post.post_deadline = post_deadline
+        db.session.commit()
+
+def insert_report_post(post_id, report_msg, reported_by):
+    report_post = PostReport(
+        post_id=post_id,
+        report_msg=report_msg,
+        reported_by=reported_by,
+        reported_at=round(datetime.datetime.now().timestamp()),
+        report_status="open",
+    )
+    db.session.add(report_post)
+    db.session.commit()
+    
+def find_reviews_by_creator(user_id):
+    reviews = db.session.query(Review).filter_by(freelancer_id=user_id).all()
+    
+    return reviews
