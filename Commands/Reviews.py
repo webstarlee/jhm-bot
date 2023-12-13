@@ -4,6 +4,7 @@ import discord
 
 from discord.ext import commands
 from discord import app_commands
+from Functions.DBController import insert_user_warn
 
 class Reviews(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -78,6 +79,26 @@ class Reviews(commands.Cog):
         
         self.database.execute("INSERT INTO Reviews VALUES (?, ?, ?, ?, ?)", (freelancer.id, client.id, category.value, rating.value, review,)).connection.commit()
 
+        await interaction.response.send_message(embed=review_embed)
+    
+    @app_commands.command(name="warn", description="Warn User")
+    async def warn_give(self, interaction: discord.Interaction, user: discord.Member, reason: str):
+        insert_user_warn(user.id, reason)
+        review_embed = discord.Embed(
+            title=f"Warning User",
+            color=discord.Color.blue()
+        )
+        review_embed.add_field(
+            name="User:",
+            value=user.display_name,
+            inline=False
+        )
+        review_embed.add_field(
+            name="Reason:",
+            value=reason,
+            inline=False
+        )
+        
         await interaction.response.send_message(embed=review_embed)
 
 async def setup(bot: commands.Bot):

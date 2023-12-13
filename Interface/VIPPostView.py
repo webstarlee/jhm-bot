@@ -6,9 +6,19 @@ import sqlite3
 import discord
 import datetime
 
-from Interface.JobPostView import PostView
+from Interface.JobPostView import PaidJobPostView
 from discord import ButtonStyle, TextStyle
 from discord.ui import View, Button, Modal, TextInput, Select, button
+from Functions.DBController import (
+    insert_paid_job_post,
+    update_for_fire_post_ping_role,
+    find_post_by_post_id,
+    update_paid_job_post,
+    update_for_fire_post_status,
+    insert_out_going_post,
+    insert_incoming_post,
+    post_remove
+)
 
 database = sqlite3.connect("./Databases/posts.sqlite")
 
@@ -28,12 +38,12 @@ class VIPPostSubmitView(View):
     @button(label="Edit Post", style=ButtonStyle.gray, row=1)
     async def edit_post_btn(self, interaction: discord.Interaction, button: Button):
         post_id = interaction.message.embeds[0].footer.text[9:]
-        post_data = database.execute("SELECT post_title, post_desc, post_payment, post_deadline FROM Posts WHERE post_id = ?", (post_id,)).fetchone()
-
-        post_title = post_data[0]
-        post_desc = post_data[1]
-        post_payment = post_data[2]
-        post_deadline = None if post_data[3] == 'N/A' else post_data[3]
+        post_data = find_post_by_post_id(post_id)
+        
+        post_title = post_data.post_title
+        post_desc = post_data.post_desc
+        post_payment = post_data.post_payment
+        post_deadline = None if post_data.post_deadline == 'N/A' else post_data.post_deadline
 
         await interaction.response.send_modal(VIPPostModal(post_title, post_desc, post_payment, post_deadline))
 
@@ -70,7 +80,7 @@ class NotificationSelector(Select):
     
     async def callback(self, interaction: discord.Interaction):
         post_id = interaction.message.embeds[0].footer.text[9:]
-        database.execute("UPDATE Posts SET ping_role = ? WHERE post_id = ?", (self.values[0], post_id,)).connection.commit()
+        update_for_fire_post_ping_role(post_id, self.values[0])
         await interaction.response.edit_message(view=VIPPostSubmitView())
 
 class VIPPostFinalView(View):
@@ -80,16 +90,15 @@ class VIPPostFinalView(View):
     
     @button(label="Submit Post", style=ButtonStyle.blurple)
     async def check_submit_btn(self, interaction: discord.Interaction, button: Button):
-        post_data = database.execute("SELECT user_id, post_title, post_desc, post_payment, post_deadline, ping_role FROM Posts WHERE post_id = ?", (self.post_id,)).fetchone()
-
+        post_data = find_post_by_post_id(self.post_id)
         post_id = self.post_id
-        post_author = interaction.guild.get_member(post_data[0])
-        post_title = post_data[1]
-        post_description = post_data[2]
-        post_deadline = "N/A" if not post_data[4] else post_data[4]
-        ping_role = interaction.guild.get_role(post_data[5])
+        post_author = interaction.guild.get_member(post_data.user_id)
+        post_title = post_data.post_title
+        post_description = post_data.post_desc
+        post_deadline = "N/A" if not post_data.post_deadline else post_data.post_deadline
+        ping_role = interaction.guild.get_role(post_data.ping_role)
+        post_payment = post_data.post_payment
 
-        post_payment = post_data[3]
         vip_hiring_channel = interaction.guild.get_channel(config.VIP_HIRING_CHANNEL_ID)
         logging_channel = interaction.guild.get_channel(config.APPROVAL_LOGGING_CHANNEL_ID)
 
@@ -116,16 +125,16 @@ class VIPPostFinalView(View):
         post_embed.set_footer(text="Post ID: {}".format(post_id))
         post_embed.set_image(url=config.PREMIUM_VIP_HIRING_BANNER_URL)
 
-        post_msg = await vip_hiring_channel.send(content=f"Notification: {ping_role.mention}", embed=post_embed, view=PostView())
-        database.execute("INSERT INTO OutgoingPosts VALUES (?, ?, ?, ?, ?, NULL, NULL)", (post_id, post_author.id, interaction.user.id, post_msg.id, None,)).connection.commit()
-        database.execute("UPDATE Posts SET status = ? WHERE post_id = ?", ('auto', post_id,)).connection.commit()
+        post_msg = await vip_hiring_channel.send(content=f"Notification: {ping_role.mention}", embed=post_embed, view=PaidJobPostView())
+        update_for_fire_post_status(post_id, "auto")
+        insert_out_going_post(post_id, post_author.id, interaction.user.id, post_msg.id, "NULL")
         await interaction.response.edit_message(content="{} Your post has been automatically approved because of your premium status!\nYou can view your post here -> {}".format(config.DONE_EMOJI, post_msg.jump_url), view=None)
         await logging_channel.send(embed=discord.Embed(title="Post Auto Approved", description=f"**Posted By:** {post_author.mention}\n**Post Type:** VIP Post\n**Approved By:** {interaction.client.user.mention}\n**Post Link:** {post_msg.jump_url}", color=discord.Color.blue()))
         return
 
     @button(label="Nevermind", style=ButtonStyle.gray)
     async def nevermind_btn(self, interaction: discord.Interaction, button: Button):
-        database.execute("DELETE FROM Posts WHERE post_id = ?", (self.post_id,)).connection.commit()
+        post_remove(self.post_id)
         await interaction.response.edit_message(content="{} Alright, Have a nice day!".format('👋'), view=None)
 
 class VIPPostModal(Modal, title="Create a Paid Job Post"):
@@ -204,35 +213,7 @@ class VIPPostModal(Modal, title="Create a Paid Job Post"):
         post_embed.set_footer(text="Post ID: {}".format(id))
         post_embed.set_image(url=config.PREMIUM_VIP_HIRING_BANNER_URL)
         
-        database.execute(
-            '''
-                INSERT INTO Posts VALUES (
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?
-                )
-            ''',
-            (
-                id,
-                interaction.user.id,
-                round(datetime.datetime.now().timestamp()),
-                self.post_title.value,
-                self.post_desc.value,
-                self.post_payment.value,
-                "N/A" if not self.post_deadline.value else self.post_deadline.value,
-                'false',
-                'paid',
-                None,
-            )
-        ).connection.commit()
-
+        insert_paid_job_post(id, interaction.user.id, post_title, post_description, post_payment, post_deadline)
         await interaction.response.send_message(embed=post_embed, view=NotificationSelectorView(), ephemeral=True)
 
 class VIPPostEditModal(Modal, title="Create a Paid Job Post"):
@@ -287,7 +268,8 @@ class VIPPostEditModal(Modal, title="Create a Paid Job Post"):
                 self.post_deadline.value = 'N/A'
 
         post_id = interaction.message.embeds[0].footer.text[9:]
-        data = database.execute("SELECT * FROM Posts WHERE post_id = ?", (post_id,)).fetchone()
+        # data = database.execute("SELECT * FROM Posts WHERE post_id = ?", (post_id,)).fetchone()
+        data = find_post_by_post_id(post_id)
         if data:
             post_title = self.post_title.value
             post_description = self.post_desc.value
@@ -311,26 +293,7 @@ class VIPPostEditModal(Modal, title="Create a Paid Job Post"):
             )
             post_embed.set_footer(text="Post ID: {}".format(post_id))
             post_embed.set_image(url=config.PREMIUM_VIP_HIRING_BANNER_URL)
-            
-            database.execute(
-                '''
-                    UPDATE Posts SET
-                        posted_at = ?,
-                        post_title = ?,
-                        post_desc = ?,
-                        post_payment = ?,
-                        post_deadline = ?
-                    WHERE post_id = ?
-                ''',
-                (
-                    round(datetime.datetime.now().timestamp()),
-                    self.post_title.value,
-                    self.post_desc.value,
-                    self.post_payment.value,
-                    "N/A" if not self.post_deadline.value else self.post_deadline.value,
-                    post_id,
-                )
-            ).connection.commit()
+            update_paid_job_post(post_id, post_title, post_description, post_payment, post_deadline)
         
             await interaction.response.edit_message(embed=post_embed, view=NotificationSelectorView())
         

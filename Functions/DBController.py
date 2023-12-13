@@ -1,6 +1,6 @@
 import db
 import datetime
-from models import Post, PostReport, IncomingPost, OutgoingPost, ReportThread, Review
+from models import Post, PostReport, IncomingPost, OutgoingPost, Warn, Review
 
 db.Base.metadata.create_all(db.engine)
 
@@ -155,7 +155,6 @@ def update_unpaid_job_post(post_id, post_title, post_desc, post_deadline):
         post.post_deadline = post_deadline
         db.session.commit()
     
-
 def insert_commission_post(post_id, user_id, post_title, post_desc, post_payment, post_deadline):
     commission_post = Post(
         post_id=post_id,
@@ -179,3 +178,11 @@ def update_commission_post(post_id, post_title, post_desc, post_payment, post_de
         post.post_payment = post_payment
         post.post_deadline = post_deadline
         db.session.commit()
+
+def insert_user_warn(user_id, reason):
+    warn = Warn(
+        user_id=user_id,
+        reason=reason,
+    )
+    db.session.add(warn)
+    db.session.commit()
