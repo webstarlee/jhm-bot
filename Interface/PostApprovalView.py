@@ -92,7 +92,7 @@ class PostApprovalView(View):
             )
             post_embed.add_field(
                 name=f"{config.INFO_EMOJI} Portfolio:",
-                value=f"{config.TOP_TO_RIGHT_EMOJI} {post_portfolio}",
+                value=f"{config.TOP_TO_RIGHT_EMOJI} {post_portfolio}\n{config.INVISIBLE_CHARACTER}",
                 inline=False
             )
             post_embed.add_field(
@@ -101,7 +101,7 @@ class PostApprovalView(View):
                 inline=True
             )
             post_embed.add_field(
-                name=f"{config.ID_TEST} Client:",
+                name=f"{config.ID_TEST} Freelancer:",
                 value=f"{config.TOP_TO_RIGHT_EMOJI} {post_author.mention}",
                 inline=True
             )

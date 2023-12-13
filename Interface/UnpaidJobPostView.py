@@ -130,10 +130,9 @@ class UnpaidJobFinalView(View):
             forum_thread = await unpaid_jobs_forum.create_thread(name=post_title, embed=post_embed, applied_tags=post_tags, view=PostView())
             await forum_thread.thread.send(view=BumpView())
 
-            await interaction.response.edit_message(view=self)
             update_for_fire_post_status(post_id, "auto")
             insert_out_going_post(post_id, post_author.id, interaction.user.id, forum_thread.message.id, forum_thread.thread.id)
-            await interaction.response.edit_message(content="{} Your post have been automatically approved!\nYou can view your post here -> {}".format(config.DONE_EMOJI, forum_thread.message.jump_url), view=None)
+            await interaction.response.edit_message(content="{} Your post has been automatically approved because of your premium status!\nYou can view your post here -> {}".format(config.DONE_EMOJI, forum_thread.message.jump_url), view=None)
             await logging_channel.send(embed=discord.Embed(title="Post Auto Approved", description=f"**Posted By:** {post_author.mention}\n**Post Type:** Unpaid Job\n**Approved By:** {interaction.client.user.mention}\n**Post Link:** {forum_thread.thread.jump_url}", color=discord.Color.blue()))
             return
 

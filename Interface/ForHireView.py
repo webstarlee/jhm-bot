@@ -113,7 +113,7 @@ class PostFinalView(View):
             )
             post_embed.add_field(
                 name=f"{config.CARD_PREMIUM_EMOJI} Portfolio:",
-                value=f"{config.TOP_TO_RIGHT_PREMIUM_EMOJI} {post_portfolio}",
+                value=f"{config.TOP_TO_RIGHT_PREMIUM_EMOJI} {post_portfolio} \n {config.INVISIBLE_CHARACTER}",
                 inline=False
             )
             post_embed.add_field(
@@ -122,7 +122,7 @@ class PostFinalView(View):
                 inline=True
             )
             post_embed.add_field(
-                name=f"{config.ID_PREMIUM_EMOJI} Client:",
+                name=f"{config.ID_PREMIUM_EMOJI} Freelancer:",
                 value=f"{config.TOP_TO_RIGHT_PREMIUM_EMOJI} {post_author.mention}",
                 inline=True
             )
@@ -134,13 +134,13 @@ class PostFinalView(View):
                 if tag.name.lower() in ping_role.name.lower():
                         post_tags.append(tag)
 
-            forum_thread = await for_hire_forum.create_thread(name=post_title, content=f"Notification:: {ping_role.mention}", embed=post_embed, applied_tags=post_tags, view=ForHirePostView())
+            forum_thread = await for_hire_forum.create_thread(name=post_title, content=f"Notification: {ping_role.mention}", embed=post_embed, applied_tags=post_tags, view=ForHirePostView())
             await forum_thread.thread.send(view=BumpView())
             
             update_for_fire_post_status(post_id, "auto")
             insert_out_going_post(post_id, post_author.id, interaction.user.id, forum_thread.message.id, forum_thread.thread.id)
 
-            await interaction.response.edit_message(content="{} Your post have been automatically approved!\nYou can view your post here -> {}".format(config.DONE_EMOJI, forum_thread.message.jump_url), view=None)
+            await interaction.response.edit_message(content="{} Your post has been automatically approved because of your premium status!\nYou can view your post here -> {}".format(config.DONE_EMOJI, forum_thread.message.jump_url), view=None)
             await logging_channel.send(embed=discord.Embed(title="Post Auto Approved", description=f"**Posted By:** {post_author.mention}\n**Post Type:** For Hire Post\n**Approved By:** {interaction.client.user.mention}\n**Post Link:** {forum_thread.thread.jump_url}", color=discord.Color.blue()))
             return
 
@@ -178,7 +178,7 @@ class PostFinalView(View):
         post_remove(self.post_id)
         await interaction.response.edit_message(content="{} Alright, Have a nice day!".format('👋'), view=None)
 
-class ForHireModal(Modal, title="Creat a For-Hire Post"):
+class ForHireModal(Modal, title="Create a For-Hire Post"):
     def __init__(self, _title: str=None, _desc: str=None, _payment: str=None, _deadline: str=None, _portfolio: str=None):
         self._title = _title
         self._desc = _desc
@@ -207,7 +207,7 @@ class ForHireModal(Modal, title="Creat a For-Hire Post"):
         self.post_portfolio = TextInput(
             label="Your Portfolio",
             placeholder=" Share Your portfolio link or previous work. if not available , enter N/A",
-            style=TextStyle.short,
+            style=TextStyle.long,
             default=None if not self._portfolio else self._portfolio,
             required=True
         )

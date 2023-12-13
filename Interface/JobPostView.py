@@ -19,8 +19,25 @@ class PostView(View):
     async def apply_button(self, interaction: discord.Interaction, button: Button):
         post_id = interaction.message.embeds[0].footer.text[9:]
         data = find_post_by_post_id(post_id)
+        print(data)
         post_author = interaction.guild.get_member(int(data.user_id))
-        await interaction.response.send_message(content=f"The job opportunity has been posted by {post_author.mention} ({post_author.name}). To apply, please reach out directly to their DMs.", ephemeral=True)
+        await interaction.response.send_message(content=f"The Unpaid-job opportunity has been posted by {post_author.mention} ({post_author.name}). To apply, please reach out directly to their DMs.", ephemeral=True)
+
+    @button(label="Report", emoji='🚨', style=ButtonStyle.red, custom_id="report_btn")
+    async def report_btn(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_modal(ReportModal())
+        
+class CommissionJobPostView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @button(label="Apply", emoji='📝', style=ButtonStyle.blurple, custom_id="apply_commission_button")
+    async def apply_commission_button(self, interaction: discord.Interaction, button: Button):
+        post_id = interaction.message.embeds[0].footer.text[9:]
+        data = find_post_by_post_id(post_id)
+        print(data)
+        post_author = interaction.guild.get_member(int(data.user_id))
+        await interaction.response.send_message(content=f"The Commission job opportunity has been posted by {post_author.mention} ({post_author.name}). To apply, please reach out directly to their DMs.", ephemeral=True)
 
     @button(label="Report", emoji='🚨', style=ButtonStyle.red, custom_id="report_btn")
     async def report_btn(self, interaction: discord.Interaction, button: Button):
@@ -45,7 +62,7 @@ class ForHirePostView(View):
     def __init__(self):
         super().__init__(timeout=None)
     
-    @button(label="Connect", emoji='🔗', style=ButtonStyle.blurple, custom_id="connect_forhire_btn")
+    @button(label="Connect", emoji='📝', style=ButtonStyle.blurple, custom_id="connect_forhire_btn")
     async def connect_forhire_btn(self, interaction: discord.Interaction, button: Button):
         post_id = interaction.message.embeds[0].footer.text[9:]
         data = find_post_by_post_id(post_id)

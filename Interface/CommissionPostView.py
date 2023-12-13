@@ -6,7 +6,7 @@ import discord
 import datetime
 
 from Interface.BumpView import BumpView
-from Interface.JobPostView import PostView
+from Interface.JobPostView import CommissionJobPostView
 from discord import ButtonStyle, TextStyle
 from Interface.PostApprovalView import PostApprovalView
 from discord.ui import View, Select, Button, Modal, TextInput, button
@@ -138,14 +138,14 @@ class CommissionFinalView(View):
                 if tag.name.lower() in ping_role.name.lower():
                         post_tags.append(tag)
 
-            forum_thread = await commission_jobs_forum.create_thread(name=post_title, embed=post_embed, applied_tags=post_tags, view=PostView())
+            forum_thread = await commission_jobs_forum.create_thread(name=post_title, embed=post_embed, applied_tags=post_tags, view=CommissionJobPostView())
             await forum_thread.thread.send(view=BumpView())
 
 
             incoming_post_remove(post_id)
             insert_out_going_post(post_id, post_author.id, interaction.user.id, forum_thread.message.id, forum_thread.thread.id)
             update_for_fire_post_status(post_id, "auto")
-            await interaction.response.edit_message(content="{} Your post have been automatically approved!\nYou can view your post here -> {}".format(config.DONE_EMOJI, forum_thread.message.jump_url), view=None)
+            await interaction.response.edit_message(content="{} Your post has been automatically approved because of your premium status!\nYou can view your post here -> {}".format(config.DONE_EMOJI, forum_thread.message.jump_url), view=None)
             await logging_channel.send(embed=discord.Embed(title="Post Auto Approved", description=f"**Posted By:** {post_author.mention}\n**Post Type:** Commission\n**Approved By:** {interaction.client.user.mention}\n**Post Link:** {forum_thread.thread.jump_url}", color=discord.Color.blue()))
             return
 

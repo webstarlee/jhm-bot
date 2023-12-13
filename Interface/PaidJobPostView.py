@@ -127,10 +127,10 @@ class PostFinalView(View):
             post_embed.set_footer(text="Post ID: {}".format(post_id))
             post_embed.set_image(url=config.PREMIUM_PAID_JOB_BANNER_URL)
 
-            post_msg = await paid_jobs_channel.send(content=f"Notification:: {ping_role.mention}", embed=post_embed, view=PaidJobPostView())
+            post_msg = await paid_jobs_channel.send(content=f"Notification: {ping_role.mention}", embed=post_embed, view=PaidJobPostView())
             update_for_fire_post_status(post_id, "auto")
             insert_out_going_post(post_id, post_author.id, interaction.user.id, post_msg.id, "NULL")
-            await interaction.response.edit_message(content="{} Your post have been automatically approved!\nYou can view your post here -> {}".format(config.DONE_EMOJI, post_msg.jump_url), view=None)
+            await interaction.response.edit_message(content="{} Your post has been automatically approved because of your premium status!\nYou can view your post here -> {}".format(config.DONE_EMOJI, post_msg.jump_url), view=None)
             await logging_channel.send(embed=discord.Embed(title="Post Auto Approved", description=f"**Posted By:** {post_author.mention}\n**Post Type:** Paid Job\n**Approved By:** {interaction.client.user.mention}\n**Post Link:** {post_msg.jump_url}", color=discord.Color.blue()))
             return
 
